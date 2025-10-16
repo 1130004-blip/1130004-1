@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>開心農場</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            touch-action: manipulation; /* 禁用雙擊縮放 */
+        }
+        .plot.highlight {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+        }
+        .seed-button.selected {
+            background-color: #f59e0b;
+            color: white;
+            transform: scale(1.1);
+        }
+        .harvest-ready::after {
+            content: '🌟';
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            animation: sparkle 1.5s infinite;
+        }
+        @keyframes sparkle {
+            0%, 100% { transform: scale(1); opacity: 0.7; }
+            50% { transform: scale(1.3); opacity: 1; }
+        }
+        .popup {
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-sky-200 flex items-center justify-center min-h-screen">
+
+    <div class="absolute top-4 left-4 text-xl font-bold text-gray-700 bg-white/50 backdrop-blur-sm px-3 py-1 rounded-lg shadow">林廷杰</div>
+    <div class="absolute top-4 right-4 text-xl font-bold text-gray-700 bg-white/50 backdrop-blur-sm px-3 py-1 rounded-lg shadow">1.0.5</div>
+
+    <div class="w-full max-w-4xl mx-auto p-4">
+        <header class="text-center mb-6">
+            <h1 class="text-4xl md:text-5xl font-bold text-green-800 drop-shadow-lg">🌱 開心農場 🥕</h1>
+            <div class="flex flex-wrap justify-center items-center gap-4 mt-2">
+                <p id="message-board" class="text-green-700 h-6 text-lg w-full text-center md:w-auto"></p>
+                <!-- Weather Display -->
+                <div id="weather-display" class="flex items-center gap-2 text-2xl font-bold text-blue-800 bg-blue-200 px-4 py-1 rounded-full order-first md:order-none">
+                    <span>☀️</span>
+                    <span>晴天</span>
+                </div>
+                <p id="gold-display" class="text-2xl font-bold text-yellow-600 drop-shadow-sm bg-yellow-200 px-4 py-1 rounded-full"></p>
+            </div>
+        </header>
+
+        <main class="flex flex-col lg:flex-row gap-8">
+            <!-- 左側控制面板 -->
+            <div class="bg-yellow-100 bg-opacity-70 p-6 rounded-2xl shadow-lg w-full lg:w-1/3">
+                <h2 class="text-2xl font-bold text-yellow-800 mb-4 border-b-2 border-yellow-300 pb-2">工具箱</h2>
+                
+                <!-- 種子選擇 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold text-yellow-700 mb-3">選擇種子 (點擊購買)</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button class="seed-button relative text-3xl p-3 bg-white rounded-lg shadow hover:bg-yellow-200 transition-all duration-200" data-seed="carrot">
+                            🥕
+                            <div class="absolute bottom-1 right-1 text-xs bg-yellow-400 text-yellow-900 font-bold px-1 rounded">💰5</div>
+                        </button>
+                        <button class="seed-button relative text-3xl p-3 bg-white rounded-lg shadow hover:bg-yellow-200 transition-all duration-200" data-seed="tomato">
+                            🍅
+                            <div class="absolute bottom-1 right-1 text-xs bg-yellow-400 text-yellow-900 font-bold px-1 rounded">💰8</div>
+                        </button>
+                        <button class="seed-button relative text-3xl p-3 bg-white rounded-lg shadow hover:bg-yellow-200 transition-all duration-200" data-seed="broccoli">
+                            🥦
+                             <div class="absolute bottom-1 right-1 text-xs bg-yellow-400 text-yellow-900 font-bold px-1 rounded">💰15</div>
+                        </button>
+                        <button class="seed-button relative text-3xl p-3 bg-white rounded-lg shadow hover:bg-yellow-200 transition-all duration-200" data-seed="eggplant">
+                            🍆
+                             <div class="absolute bottom-1 right-1 text-xs bg-yellow-400 text-yellow-900 font-bold px-1 rounded">💰12</div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 澆水工具 -->
+                 <div class="mb-6">
+                    <h3 class="text-lg font-semibold text-yellow-700 mb-3">工具</h3>
+                     <div class="grid grid-cols-2 gap-3">
+                        <button id="water-tool" class="seed-button text-3xl p-3 bg-white rounded-lg shadow hover:bg-blue-200 transition-all duration-200">💧</button>
+                    </div>
+                </div>
+
+                <!-- 倉庫 -->
+                <div>
+                    <h3 class="text-lg font-semibold text-yellow-700 mb-3">我的倉庫</h3>
+                    <div id="inventory" class="grid grid-cols-2 gap-4 text-center">
+                        <!-- 庫存顯示區 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側農地 -->
+            <div class="flex-1 bg-green-700 p-4 rounded-2xl shadow-2xl">
+                <div id="garden" class="grid grid-cols-4 gap-3">
+                    <!-- 農地格子會由 JavaScript 動態生成 -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 彈出式訊息 -->
+    <div id="popup" class="popup hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm mx-4">
+            <p id="popup-message" class="text-2xl font-bold text-gray-800"></p>
+            <button id="popup-close" class="mt-6 bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600 transition">知道了</button>
+        </div>
+    </div>
+
+
+    <script>
+        // DOM 元素
+        const gardenGrid = document.getElementById('garden');
+        const inventoryDisplay = document.getElementById('inventory');
+        const messageBoard = document.getElementById('message-board');
+        const seedButtons = document.querySelectorAll('.seed-button');
+        const waterTool = document.getElementById('water-tool');
+        const popup = document.getElementById('popup');
+        const popupMessage = document.getElementById('popup-message');
+        const popupClose = document.getElementById('popup-close');
+        const goldDisplay = document.getElementById('gold-display');
+        const weatherDisplay = document.getElementById('weather-display');
+
+        // 遊戲設定
+        const gridSize = 16;
+        const growthTime = 10000; // 10秒鐘成長一個階段
+        const waterBoost = 3000; // 澆水加速3秒
+        const WEATHER_CHANGE_INTERVAL = 20000; // 天氣每 20 秒變化一次
+
+        // 植物資訊
+        const plantTypes = {
+            carrot: { name: '胡蘿蔔', stages: ['🌱', '🌿', '🥕'], harvestCount: 2, goldValue: 10, cost: 5 },
+            tomato: { name: '番茄', stages: ['🌱', '🌿', '🍅'], harvestCount: 3, goldValue: 15, cost: 8 },
+            broccoli: { name: '青花菜', stages: ['🌱', '🌳', '🥦'], harvestCount: 1, goldValue: 25, cost: 15 },
+            eggplant: { name: '茄子', stages: ['🌱', '🌳', '🍆'], harvestCount: 2, goldValue: 20, cost: 12 }
+        };
+        const inventory = {};
+        
+        // 天氣資訊
+        const weatherTypes = {
+            sunny: { name: '晴天', icon: '☀️', effect: 'growth_boost' },
+            cloudy: { name: '陰天', icon: '☁️', effect: 'normal' },
+            rainy: { name: '雨天', icon: '🌧️', effect: 'auto_water' }
+        };
+
+        // 遊戲狀態
+        let gardenPlots = [];
+        let selectedTool = null; // 'carrot', 'tomato', 'water', etc.
+        let messageTimeout;
+        let gold = 0;
+        let currentWeather = 'sunny'; // 初始天氣
+
+        // --- 函式 ---
+
+        // 顯示訊息
+        function showMessage(msg, duration = 3000) {
+            messageBoard.textContent = msg;
+            clearTimeout(messageTimeout);
+            messageTimeout = setTimeout(() => {
+                messageBoard.textContent = '';
+            }, duration);
+        }
+
+        function showPopup(msg) {
+            popupMessage.textContent = msg;
+            popup.classList.remove('hidden');
+        }
+        
+        popupClose.addEventListener('click', () => {
+            popup.classList.add('hidden');
+        });
+
+        // 更新金幣顯示
+        function updateGoldDisplay() {
+            goldDisplay.innerHTML = `💰 ${gold}`;
+        }
+
+        // 更新工具選擇
+        function selectTool(tool) {
+            selectedTool = selectedTool === tool ? null : tool;
+            
+            seedButtons.forEach(btn => {
+                if(btn.dataset.seed === selectedTool || (btn.id === 'water-tool' && selectedTool === 'water')) {
+                    btn.classList.add('selected');
+                } else {
+                    btn.classList.remove('selected');
+                }
+            });
+            
+            if (selectedTool) {
+                if(selectedTool === 'water') {
+                    showMessage('選擇了澆水器，點擊植物來澆水');
+                } else {
+                    const cost = plantTypes[selectedTool].cost;
+                    showMessage(`選擇了 ${plantTypes[selectedTool].name} 種子 (成本: ${cost} 金幣)`);
+                }
+            } else {
+                showMessage('取消選擇');
+            }
+        }
+
+        // 更新倉庫顯示
+        function renderInventory() {
+            inventoryDisplay.innerHTML = '';
+            Object.keys(plantTypes).forEach(type => {
+                const count = inventory[type] || 0;
+                const plant = plantTypes[type];
+                const itemHTML = `
+                    <div class="bg-white p-2 rounded-lg shadow-inner">
+                        <span class="text-3xl">${plant.stages[plant.stages.length - 1]}</span>
+                        <span class="text-lg font-bold text-gray-700">${count}</span>
+                    </div>
+                `;
+                inventoryDisplay.innerHTML += itemHTML;
+            });
+        }
+
+        // 渲染農地
+        function renderGarden() {
+            gardenGrid.innerHTML = '';
+            gardenPlots.forEach((plot, index) => {
+                const plotDiv = document.createElement('div');
+                plotDiv.classList.add('plot', 'relative', 'bg-amber-800', 'w-full', 'aspect-square', 'rounded-lg', 'flex', 'items-center', 'justify-center', 'text-4xl', 'cursor-pointer', 'transition-transform', 'duration-200', 'hover:bg-amber-700');
+                plotDiv.dataset.index = index;
+
+                if (plot) {
+                    plotDiv.textContent = plot.stages[plot.growthStage];
+                    if (plot.growthStage === plot.stages.length - 1) {
+                        plotDiv.classList.add('harvest-ready');
+                    }
+                    if(plot.watered) {
+                        plotDiv.style.backgroundColor = '#604020'; // 濕潤的土壤
+                    }
+                }
+
+                plotDiv.addEventListener('mouseenter', () => plotDiv.classList.add('highlight'));
+                plotDiv.addEventListener('mouseleave', () => plotDiv.classList.remove('highlight'));
+
+                gardenGrid.appendChild(plotDiv);
+            });
+        }
+        
+        // --- 天氣系統 ---
+        
+        // 根據天氣獲取修正後的生長時間
+        function getModifiedGrowthTime() {
+            if (currentWeather === 'sunny') {
+                return growthTime * 0.8; // 晴天生長速度加快20%
+            }
+            return growthTime; // 陰天和雨天為正常速度
+        }
+
+        // 更新天氣顯示
+        function updateWeatherDisplay() {
+            const weather = weatherTypes[currentWeather];
+            weatherDisplay.innerHTML = `<span>${weather.icon}</span><span>${weather.name}</span>`;
+        }
+        
+        // 改變天氣
+        function changeWeather() {
+            const weatherKeys = Object.keys(weatherTypes);
+            currentWeather = weatherKeys[Math.floor(Math.random() * weatherKeys.length)];
+            
+            updateWeatherDisplay();
+            showMessage(`天氣變成了${weatherTypes[currentWeather].name}！`, 4000);
+            
+            // 如果下雨，自動澆水
+            if (currentWeather === 'rainy') {
+                let wateredCount = 0;
+                gardenPlots.forEach((plot, index) => {
+                    if (plot && !plot.watered && plot.growthStage < plot.stages.length - 1) {
+                       // 自動澆水，觸發加速
+                       plot.watered = true;
+                       clearTimeout(plot.growthTimer);
+                       const remainingTime = plot.nextGrowthTime - Date.now();
+                       const boostedTime = Math.max(500, remainingTime - waterBoost); 
+                       startGrowth(index, boostedTime, plot.growthStage);
+                       wateredCount++;
+                    }
+                });
+                if(wateredCount > 0){
+                    showMessage('下雨了！所有作物都澆過水了！', 4000);
+                }
+                renderGarden(); // 重新渲染以顯示濕潤的土壤
+            }
+        }
+
+
+        // --- 核心遊戲邏輯 ---
+
+        // 處理地塊點擊事件
+        function handlePlotClick(e) {
+            const plotDiv = e.target.closest('.plot');
+            if (!plotDiv) return;
+
+            const index = parseInt(plotDiv.dataset.index);
+            const plot = gardenPlots[index];
+
+            if (selectedTool === 'water') {
+                waterPlant(index);
+            } else if (selectedTool) {
+                plantSeed(index);
+            } else if (plot) {
+                harvestPlant(index);
+            } else {
+                showMessage('請先從工具箱選擇種子或工具');
+            }
+        }
+
+        // 種植
+        function plantSeed(index) {
+            if (gardenPlots[index]) {
+                showMessage('這塊地已經有作物了！');
+                return;
+            }
+
+            const seedType = selectedTool;
+            const plantCost = plantTypes[seedType].cost;
+
+            if (gold < plantCost) {
+                showMessage('金幣不足，無法購買種子！');
+                selectTool(null); // 取消選擇
+                return;
+            }
+
+            gold -= plantCost;
+            updateGoldDisplay();
+
+            gardenPlots[index] = {
+                type: seedType,
+                stages: plantTypes[seedType].stages,
+                growthStage: 0,
+                growthTimer: null,
+                watered: false
+            };
+            
+            // 使用根據天氣調整的生長時間
+            startGrowth(index, getModifiedGrowthTime());
+            showMessage(`種下了一顆${plantTypes[seedType].name}！ 花費 ${plantCost} 金幣`);
+            selectTool(null); // 種下後自動取消選擇
+            renderGarden();
+        }
+
+        // 澆水
+        function waterPlant(index) {
+             const plot = gardenPlots[index];
+             if(currentWeather === 'rainy') {
+                 showMessage('正在下雨，不需要再澆水了！');
+                 return;
+             }
+             if (!plot) {
+                 showMessage('這裡什麼都沒有，不用澆水');
+                 return;
+             }
+             if (plot.watered) {
+                 showMessage('土壤還很濕潤，等一下再澆水');
+                 return;
+             }
+             if (plot.growthStage === plot.stages.length - 1) {
+                 showMessage('作物已經成熟，可以收成囉！');
+                 return;
+             }
+             
+             plot.watered = true;
+             // 清除舊計時器並設定一個加速的新計時器
+             clearTimeout(plot.growthTimer);
+             const remainingTime = plot.nextGrowthTime - Date.now();
+             const boostedTime = Math.max(500, remainingTime - waterBoost); // 至少等0.5秒
+             startGrowth(index, boostedTime, plot.growthStage);
+             
+             showMessage(`${plantTypes[plot.type].name} 喝飽水了！`);
+             renderGarden();
+        }
+
+        // 開始成長
+        function startGrowth(index, time, currentStage = undefined) {
+            const plot = gardenPlots[index];
+            if (!plot) return;
+
+            if (currentStage !== undefined) {
+              plot.growthStage = currentStage;
+            } else {
+              plot.growthStage = 0;
+            }
+            
+            plot.nextGrowthTime = Date.now() + time;
+
+            plot.growthTimer = setTimeout(() => {
+                growPlant(index);
+            }, time);
+        }
+
+        // 成長
+        function growPlant(index) {
+            const plot = gardenPlots[index];
+            if (!plot || plot.growthStage >= plot.stages.length - 1) {
+                renderGarden();
+                return;
+            }
+
+            plot.growthStage++;
+            plot.watered = false; // 成長後土壤變乾
+            
+            if (plot.growthStage < plot.stages.length - 1) {
+                // 使用根據天氣調整的生長時間
+                startGrowth(index, getModifiedGrowthTime(), plot.growthStage);
+            } else {
+                showMessage(`${plantTypes[plot.type].name} 成熟了，可以收成了！`);
+            }
+            renderGarden();
+        }
+
+
+        // 收成
+        function harvestPlant(index) {
+            const plot = gardenPlots[index];
+            if (!plot || plot.growthStage < plot.stages.length - 1) {
+                showMessage('作物還沒成熟喔！');
+                return;
+            }
+
+            const plantType = plot.type;
+            const harvestAmount = plantTypes[plantType].harvestCount;
+            const goldEarned = plantTypes[plantType].goldValue * harvestAmount;
+
+            inventory[plantType] = (inventory[plantType] || 0) + harvestAmount;
+            gold += goldEarned;
+            
+            showPopup(`收穫了 ${harvestAmount} 個 ${plantTypes[plantType].name}! 賺到了 ${goldEarned} 枚金幣!`);
+
+            clearTimeout(plot.growthTimer);
+            gardenPlots[index] = null;
+
+            renderGarden();
+            renderInventory();
+            updateGoldDisplay();
+        }
+
+
+        // 初始化遊戲
+        function init() {
+            gardenPlots = new Array(gridSize).fill(null);
+            gold = 50; // 初始金幣
+            
+            Object.keys(plantTypes).forEach(type => {
+                inventory[type] = 0;
+            });
+            
+            // 綁定事件
+            seedButtons.forEach(button => {
+                if(button.dataset.seed) {
+                   button.addEventListener('click', () => selectTool(button.dataset.seed));
+                }
+            });
+            waterTool.addEventListener('click', () => selectTool('water'));
+            gardenGrid.addEventListener('click', handlePlotClick);
+            
+            // 初始化天氣系統
+            currentWeather = 'sunny';
+            updateWeatherDisplay();
+            setInterval(changeWeather, WEATHER_CHANGE_INTERVAL);
+
+            renderGarden();
+            renderInventory();
+            updateGoldDisplay();
+            showPopup("歡迎來到開心農場！注意天氣變化會影響作物喔！");
+        }
+
+        // 啟動遊戲
+        init();
+    </script>
+</body>
+</html>
+
+
